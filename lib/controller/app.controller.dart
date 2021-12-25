@@ -1,162 +1,29 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:developer';
 import 'dart:io';
-
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:get/get.dart';
-import 'package:get/get_state_manager/src/simple/get_controllers.dart';
-import 'package:location/location.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
-import 'package:webviewx/webviewx.dart';
+import 'dart:developer';
+import 'package:weview/controller/take_image_controller.dart';
 import 'package:weview/utils/export.util.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:weview/view/take_image.dart';
 
 class AppController extends GetxController {
-  double progress = 0;
-  late StreamSubscription subscription;
-  late bool isConnected;
-  late String platformVersion;
-  late LocationData locationData;
-  Map deviceInfo = {};
+  late WebViewXController webviewController;
   QRViewController? qrViewController;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   final RxString barcodeResult = RxString('initialResult');
-  late WebViewXController webviewController;
+  Map deviceInfo = {};
 
-  @override
-  onInit() {
-    subscription = Connectivity().onConnectivityChanged.listen(
-      (ConnectivityResult result) {
-        // log(result.toString());
-        isConnectedToInternet(result);
-      },
-    );
-
-    super.onInit();
-  }
-
-  @override
-  void onClose() {
-    subscription.cancel();
-    super.onClose();
-  }
-
-  InAppWebViewGroupOptions options = InAppWebViewGroupOptions(
-    android: AndroidInAppWebViewOptions(
-      useHybridComposition: true,
-    ),
-  );
-
-  Future<void> getInfo(InAppWebViewController controller) async {
-    controller.addJavaScriptHandler(
-      handlerName: 'AjaxHandler',
-      callback: (args) async {
-        // log('arags: ' + args.toString());
-        //* args = [ip, location, connection, mac]
-        String _args = args[2].toString();
-
-        //! important:: unable to call async function in switch-case. so I have used if else
-
-        if (_args == 'ip') {
-          String ip = await getIP();
-          log('IP Address: ' + ip);
-          return {'getData': ip};
-        } else if (_args == 'location') {
-          try {
-            var res = await getLocation();
-            log('location: ' + res.toString());
-            return {'getData': 'Location: ${res.toString()}'};
-          } catch (e) {
-            log(e.toString());
-          }
-        } else if (_args == 'connection') {
-          log('Connection: ' + isConnected.toString());
-          return {'getData': isConnected.toString()};
-        } else if (_args == 'mac') {
-          Map deviceInfo = await getDeviceInfo();
-          log(deviceInfo.toString());
-          //todo:: Please fetch your required info
-
-          log('MAC Address: ' 'Mac Address: 00:0a:95:9d:68:16');
-          return {'getData': 'Mac Address: 00:0a:95:9d:68:16'};
-        } else if (_args == 'bcs') {
-          // var res = await scanQrCode();
-          // log('barcode: barcode');
-          // return {'barcode': res};
-        }
-      },
-    );
-  }
-
-  Future<void> getInfoWebViewX(
-    WebViewXController controller,
-  ) async {
-    String _type = 'ip';
-    controller
+  Future<void> setIPandUI() async {
+    String ip = await getIP();
+    webviewController
         .evalRawJavascript(
-      'window.onPageFinishedFromFlutter("$_type")',
+      'window.setIP("$ip")',
       inGlobalContext: false,
     )
-        .then((value) async {
-      value = value.toString();
-      value = value.substring(1, value.length - 1);
-
-      log('type: ' + value);
-      if (value == 'ip') {
-        String ip = await getIP();
-        log('IP Address: ' + ip);
-        _sendResponse(controller, ip);
-      } else if (value == 'location') {
-        try {
-          var res = await getLocation();
-          log('location: ' + res.toString());
-          _sendResponse(controller, res.toString());
-        } catch (e) {
-          log(e.toString());
-        }
-      } else if (value == 'connection') {
-        log('Connection: ' + isConnected.toString());
-        _sendResponse(controller, isConnected.toString());
-      } else if (value == 'mac') {
-        String uid = '';
-        if (Platform.isAndroid) {
-          uid = deviceInfo['androidId'].toString();
-          log('identifier: ' + deviceInfo['androidId'].toString());
-        } else {
-          uid = deviceInfo['identifierForVendor'].toString();
-          log('identifier: ' + deviceInfo['identifierForVendor'].toString());
-        }
-
-        _sendResponse(webviewController, uid);
-        log('MAC Address: ' 'uid: $uid');
-      } else {
-        log('false');
-      }
+        .then((value) {
+      log('final response: ' + value.toString());
     });
-  }
 
-  Future<void> sendIP() async {
-    String ip = await getIP();
-    log('IP Address: ' + ip);
-    _sendResponse(webviewController, ip);
-  }
-
-  Future<void> sendLocation() async {
-    try {
-      var res = await getLocation();
-      log('location: ' + res.toString());
-      _sendResponse(webviewController, res.toString());
-    } catch (e) {
-      log(e.toString());
-    }
-  }
-
-  Future<void> sendConnection() async {
-    log('Connection: ' + isConnected.toString());
-    _sendResponse(webviewController, isConnected.toString());
-  }
-
-  Future<void> sendUID() async {
     Map deviceInfo = await getDeviceInfo();
     String uid = '';
     if (Platform.isAndroid) {
@@ -167,30 +34,14 @@ class AppController extends GetxController {
       log('identifier: ' + deviceInfo['identifierForVendor'].toString());
     }
 
-    _sendResponse(webviewController, uid);
-    log('MAC Address: ' 'uid: $uid');
-  }
-
-  void _sendResponse(controller, data) {
-    controller
+    webviewController
         .evalRawJavascript(
-      'window.responseForFlutterRequest("$data")',
+      'window.setUI("$uid")',
       inGlobalContext: false,
     )
         .then((value) {
       log('final response: ' + value.toString());
     });
-  }
-
-  Future<void> sendCodeData(controller, String data) async {
-    log('here');
-    controller.addJavaScriptHandler(
-      handlerName: 'handlerFoo',
-      callback: (args) async {
-        log('sendcode data');
-        return data;
-      },
-    );
   }
 
   Future<String> onQRViewCreated(QRViewController controller) async {
@@ -208,7 +59,7 @@ class AppController extends GetxController {
     // log('${DateTime.now().toIso8601String()}_onPermissionSet $p');
     if (!p) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('no Permission')),
+        const SnackBar(content: Text('no Permission')),
       );
     }
   }
@@ -223,53 +74,67 @@ class AppController extends GetxController {
     return _ip;
   }
 
-  Future<void> isConnectedToInternet(result) async {
-    if (result.toString() == 'ConnectivityResult.mobile' || result.toString() == 'ConnectivityResult.wifi') {
-      isConnected = true;
-    } else {
-      isConnected = false;
-    }
-    // log(isConnected.toString());
-  }
-
-  Future<dynamic> getLocation() async {
-    Location location = Location();
-
-    bool _serviceEnabled;
-    PermissionStatus _permissionGranted;
-
-    _serviceEnabled = await location.serviceEnabled();
-    if (!_serviceEnabled) {
-      _serviceEnabled = await location.requestService();
-      if (!_serviceEnabled) {
-        log('location service not enabled');
-        return;
-      }
-    }
-
-    _permissionGranted = await location.hasPermission();
-    if (_permissionGranted == PermissionStatus.denied) {
-      _permissionGranted = await location.requestPermission();
-      if (_permissionGranted != PermissionStatus.granted) {
-        log('location permission denied');
-        return;
-      }
-    }
-
-    try {
-      locationData = await location.getLocation();
-    } catch (e) {
-      log(e.toString());
-    }
-
-    return {'latitude': locationData.latitude, 'longitude': locationData.longitude};
-    // locationData.toString();
-  }
-
   Future<Map> getDeviceInfo() async {
     final deviceInfoPlugin = DeviceInfoPlugin();
     final deviceInfo = await deviceInfoPlugin.deviceInfo;
     final map = deviceInfo.toMap();
     return map;
   }
+
+  Set<DartCallback> appDartCallBacks = {
+    DartCallback(
+      name: ksScanCallBack,
+      callBack: (msg) {
+        log('scan');
+        Get.to(
+          () => BarcodeScanner(
+            appController: Get.put<AppController>(AppController()),
+            iawvctrl: Get.put<AppController>(AppController()).webviewController,
+          ),
+        );
+      },
+    ),
+    DartCallback(
+      name: ksTakeImageCallBack,
+      callBack: (msg) async {
+        Get.to(() => TakeImage());
+        log('take image');
+      },
+    ),
+  };
+
+  Future<void> takeImage() async {
+    try {
+      final ImagePicker _picker = ImagePicker();
+      final XFile? _image = await _picker.pickImage(source: ImageSource.camera);
+      if (_image != null) {
+        final List<int> imageBytes = await _image.readAsBytes();
+        final String base64Image = base64Encode(imageBytes);
+        final String image = 'data:image/png;base64,' + base64Image;
+        // log('image: ' + image);
+        Get.back();
+        Get.back();
+        webviewController
+            .evalRawJavascript(
+          'window.setImage("$image")',
+          inGlobalContext: false,
+        )
+            .then((value) {
+          log('final response: ' + value.toString());
+        });
+        Get.delete<TakeImageController>();
+      } else {
+        log('image not selected');
+        return;
+      }
+    } on PlatformException catch (e) {
+      log("Failed to Pick Image $e");
+    }
+  }
+  
+  Future<void> prcessQrCodeScan() async {
+    
+  }
+  
+  //* end
 }
