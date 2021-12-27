@@ -1,4 +1,7 @@
+import 'dart:developer';
+
 import 'package:weview/utils/export.util.dart';
+import 'package:weview/view/take_image.dart';
 
 class AppWebView extends StatelessWidget {
   AppWebView({Key? key}) : super(key: key);
@@ -21,7 +24,34 @@ class AppWebView extends StatelessWidget {
           onPageFinished: (value) async {
             await _ctrl.setIPandUI();
           },
-          dartCallBacks: _ctrl.appDartCallBacks,
+          dartCallBacks: {
+            DartCallback(
+              name: ksScanCallBack,
+              callBack: (msg) {
+                log('scan');
+                Get.to(
+                  () => BarcodeScanner(
+                    appController: Get.put<AppController>(AppController()),
+                    iawvctrl: Get.put<AppController>(AppController()).webviewController,
+                  ),
+                );
+              },
+            ),
+            DartCallback(
+              name: ksTakeImageCallBack,
+              callBack: (msg) async {
+                Get.to(() => TakeImage());
+                log('take image');
+              },
+            ),
+            DartCallback(
+              name: ksUpdateIPCallBack,
+              callBack: (msg) async {
+                log('update ip');
+                _ctrl.updateIP();
+              },
+            )
+          },
         ),
       ),
     );

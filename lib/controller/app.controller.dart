@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:developer';
+import 'dart:io';
+
+import 'package:image_picker/image_picker.dart';
 import 'package:weview/controller/take_image_controller.dart';
 import 'package:weview/utils/export.util.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:weview/view/take_image.dart';
 
 class AppController extends GetxController {
   late WebViewXController webviewController;
@@ -14,7 +14,7 @@ class AppController extends GetxController {
   Map deviceInfo = {};
 
   Future<void> setIPandUI() async {
-    String ip = await getIP();
+    /* String ip = await getIP();
     webviewController
         .evalRawJavascript(
       'window.setIP("$ip")',
@@ -22,7 +22,7 @@ class AppController extends GetxController {
     )
         .then((value) {
       log('final response: ' + value.toString());
-    });
+    }); */
 
     Map deviceInfo = await getDeviceInfo();
     String uid = '';
@@ -81,28 +81,6 @@ class AppController extends GetxController {
     return map;
   }
 
-  Set<DartCallback> appDartCallBacks = {
-    DartCallback(
-      name: ksScanCallBack,
-      callBack: (msg) {
-        log('scan');
-        Get.to(
-          () => BarcodeScanner(
-            appController: Get.put<AppController>(AppController()),
-            iawvctrl: Get.put<AppController>(AppController()).webviewController,
-          ),
-        );
-      },
-    ),
-    DartCallback(
-      name: ksTakeImageCallBack,
-      callBack: (msg) async {
-        Get.to(() => TakeImage());
-        log('take image');
-      },
-    ),
-  };
-
   Future<void> takeImage() async {
     try {
       final ImagePicker _picker = ImagePicker();
@@ -131,10 +109,18 @@ class AppController extends GetxController {
       log("Failed to Pick Image $e");
     }
   }
-  
-  Future<void> prcessQrCodeScan() async {
-    
+
+  Future<void> updateIP() async {
+    String ip = await getIP();
+    webviewController
+        .evalRawJavascript(
+      'window.setIP("$ip")',
+      inGlobalContext: false,
+    )
+        .then((value) {
+      log('final response: ' + value.toString());
+    });
   }
-  
+
   //* end
 }
